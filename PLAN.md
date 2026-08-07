@@ -1,7 +1,9 @@
 # 📋 Plan de Desarrollo — Project Copilot (MVP)
 
-**Versión**: 1.1 · **Fecha**: 2026-08-07 · **Estado**: ✅ Aprobado — listo para implementación
+**Versión**: 1.2 · **Fecha**: 2026-08-07 · **Estado**: ✅ Aprobado — listo para implementación
 
+> Cambios desde v1.1: el agente (Módulo C, tool-calling loop) pasa a usar **OpenAI** en vez de Claude, consolidando todo bajo un solo proveedor (OpenAI para agente + embeddings). El agente depende de una interfaz **`LLMProvider`** (única implementación inicial: `OpenAIProvider`) para poder cambiar de proveedor sin reescribir el dominio. `ANTHROPIC_API_KEY` queda documentada como opcional para un futuro adaptador Claude. Riesgo de "segundo vendor" reformulado.
+>
 > Cambios desde v1.0: se cerraron las 4 preguntas abiertas (backend TypeScript full-stack; embeddings OpenAI `text-embedding-3-small` → `vector(1536)`; sin login / proyecto demo único; RAG solo PDF + Markdown/TXT). Se eliminó la sección de Open Questions, se fijó el stack y se ajustaron los riesgos dependientes.
 
 Este documento es la **fuente de verdad** para la implementación fase por fase por parte de code-dev-coordinator.
@@ -39,11 +41,11 @@ Este documento es la **fuente de verdad** para la implementación fase por fase 
 - B4. Resaltado de tareas referenciadas por el agente (`bar-highlight`, ya existe en la referencia).
 
 **Módulo C — Agente de IA (tool-calling)**
-- C1. Loop de agente con Claude (`claude-opus-4-8`) + herramientas.
+- C1. Loop de agente con **OpenAI** (function/tool calling) + herramientas, a través de la interfaz **`LLMProvider`** (no acoplado a la SDK directamente).
 - C2. Tools de tareas: `create_task`, `update_task` (mover/reprogramar), `delete_task`, `list_tasks`.
 - C3. Tool de análisis: `detect_conflicts` (solapes de fecha, violaciones de dependencia, fin-antes-de-inicio).
 - C4. Tool de RAG: `search_documents` (retrieval sobre pgvector, devuelve chunks + fuente para citar).
-- C5. System prompt + política de herramientas (cuándo usar cada una; descripciones "call this when…").
+- C5. System prompt + política de herramientas (cuándo usar cada una; descripciones "call this when…"). La definición de tools, el system prompt y el manejo del loop viven en el **dominio** y dependen de `LLMProvider`, no de la SDK de OpenAI.
 
 **Módulo D — RAG / Documentos**
 - D1. Subida de documentos por proyecto (**PDF + Markdown/TXT**).
@@ -127,7 +129,8 @@ messages                               -- historial de chat
 | Frontend | **Next.js (App Router) + TypeScript + React** | Patrón exacto de las vacantes; rutas API integradas; deploy gratis en Vercel. |
 | UI Gantt | **Adaptación de `reference-ui`** (Frappe Gantt / SVG) envuelta en React | Ya funciona y es propio; wrapper con `useRef` + `refresh(tasks)`. |
 | Streaming | **SSE** (`text/event-stream`) | Coincide 1:1 con el streaming nativo de la Claude API; más simple que WebSockets para chat. |
-| Backend/Agente | **Next.js API routes en TypeScript** con el **SDK oficial de Anthropic** (`@anthropic-ai/sdk`), modelo `claude-opus-4-8`, `thinking: adaptive`, `effort` ajustable | **Q1 cerrada: TypeScript full-stack.** Un solo lenguaje/vendor de deploy, código cohesionado; Node está aceptado en las vacantes investigadas. |
+| Backend (topología) | **Next.js API routes en TypeScript** | **Q1 cerrada: TypeScript full-stack.** Un solo lenguaje/vendor de deploy, código cohesionado; Node está aceptado en las vacantes investigadas. |
+| Agente / LLM | **OpenAI** (function/tool calling vía Chat Completions o Responses API; modelo a definir en F3, p.ej. `gpt-5` u otro con tool-calling robusto) detrás de la interfaz **`LLMProvider`** (única implementación inicial: `OpenAIProvider`) | **Decisión D5:** consolidar agente + embeddings bajo un solo proveedor (OpenAI) simplifica credenciales/infra para la demo. El dominio del agente depende de `LLMProvider`, no de la SDK, para poder cambiar de proveedor (volver a Claude u otro) sin reescribir el agente. |
 | Base de datos | **PostgreSQL + pgvector en Supabase (free)** | Una sola BD para datos estructurados + embeddings; demo en vivo sin costo. |
 | Embeddings | **OpenAI `text-embedding-3-small` (1536 dims)** vía `EmbeddingsProvider` (interfaz) | **Q2 cerrada.** Razón: "OpenAI" apareció como keyword explícito en las vacantes reales; se prioriza reconocibilidad de mercado. Detrás de interfaz para poder cambiarlo. |
 | Auth | **Ninguna** — proyecto demo único compartido | **Q3 cerrada.** Máxima rapidez a demo; Auth queda como nice-to-have documentado. |
@@ -136,7 +139,10 @@ messages                               -- historial de chat
 | Infra | Docker + GitHub Actions (lint + test) | Patrón de vacante; CI barato. |
 | Deploy | Vercel (frontend + API routes) + Supabase (BD) | Todo en capa gratuita, un solo servicio de app. |
 
-**Variables de entorno clave**: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `DATABASE_URL` (Supabase / pgvector).
+**Variables de entorno clave** (`.env.example`):
+- `OPENAI_API_KEY` — **única requerida para el agente + embeddings** en el MVP.
+- `DATABASE_URL` — Supabase / pgvector.
+- `ANTHROPIC_API_KEY` — **opcional, comentada**. Se deja documentada (no borrada) como decisión intencional de extensibilidad: un futuro `AnthropicProvider` (implementación de `LLMProvider`) la usaría para volver a Claude sin tocar el dominio del agente.
 
 ---
 
@@ -153,20 +159,23 @@ messages                               -- historial de chat
 │         │                                                                       │
 │         ▼                                                                       │
 │  ┌───────────── Agente (dominio) ─────────────┐                                 │
-│  │  agent loop (Claude tool-calling)          │                                 │
+│  │  agent loop (tool-calling)                 │                                 │
 │  │  tools: create/update/delete/list_task,    │                                 │
 │  │         detect_conflicts, search_documents │                                 │
+│  │  ── depende de ─► LLMProvider (interfaz)    │                                 │
 │  └──────┬───────────────────────┬─────────────┘                                 │
 │         ▼                       ▼                                                │
 │   TasksRepository        RAG service (chunk→embed→search)                       │
 └─────────┬───────────────────────┬───────────────────────────────────────────────┘
           ▼                       ▼
    Postgres (tasks, deps)   Postgres + pgvector (document_chunks)   ← misma BD Supabase
-          ▲                       ▲
-   Anthropic client (agente)   OpenAI client (embeddings)
+
+   ── Infra (implementaciones tras interfaz) ─────────────────────────────────
+   LLMProvider ◄── OpenAIProvider (inicial)   ┊   AnthropicProvider (futuro, opcional)
+   EmbeddingsProvider ◄── OpenAIEmbeddings (inicial)
 ```
 
-Monolito modular con separación estricta: **UI → API → Agente/Dominio → Repositorios → Infra**. Las tools del agente no tocan HTTP ni Claude directamente; solo invocan repos/servicios (testeables con mocks). El `EmbeddingsProvider` y el cliente Anthropic viven en la capa de infraestructura tras interfaces.
+Monolito modular con separación estricta: **UI → API → Agente/Dominio → Repositorios → Infra**. El dominio del agente (definición de tools, system prompt, manejo del loop) **habla con la interfaz `LLMProvider`, nunca con la SDK de OpenAI directamente**. `OpenAIProvider` es la única implementación inicial; un `AnthropicProvider` futuro se enchufa sin tocar el dominio. Igual patrón para `EmbeddingsProvider`. Ambos providers viven en la capa de infraestructura. Las tools no tocan HTTP ni el LLM; solo invocan repos/servicios (testeables con mocks).
 
 ---
 
@@ -192,10 +201,10 @@ Ejecución feature-por-feature vía **code-dev-coordinator**, que orquesta a los
 
 | Fase | Entregable | Hito verificable |
 |---|---|---|
-| **F0 — Scaffolding** | Monorepo Next.js+TS, env (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `DATABASE_URL`), proyecto Supabase, pgvector habilitado, CI (lint+test) skeleton, Dockerfile | `npm run dev` levanta; CI verde en PR vacío. |
+| **F0 — Scaffolding** | Monorepo Next.js+TS, `.env.example` (`OPENAI_API_KEY` requerida; `DATABASE_URL`; `ANTHROPIC_API_KEY` comentada/opcional), proyecto Supabase, pgvector habilitado, CI (lint+test) skeleton, Dockerfile | `npm run dev` levanta; CI verde en PR vacío. |
 | **F1 — Data layer** | Migraciones (projects, tasks, deps, documents, chunks `vector(1536)`, messages), repos, seed de proyecto ejemplo | Seed cargado; repos con tests unitarios. |
 | **F2 — Gantt UI (read-only)** | `GanttView` React que renderiza tareas desde la BD | Gantt muestra el seed en pantalla. |
-| **F3 — Agente + tools de tareas** | Loop tool-calling + `create/update/delete/list_task`, endpoint `/api/chat` con SSE | "Crea una tarea Diseño del 1 al 5 de sept" persiste y responde en streaming. |
+| **F3 — Agente + tools de tareas** | Interfaz `LLMProvider` + `OpenAIProvider`; loop tool-calling (OpenAI) + `create/update/delete/list_task`; endpoint `/api/chat` con SSE. Fijar el modelo OpenAI concreto. | "Crea una tarea Diseño del 1 al 5 de sept" persiste y responde en streaming; dominio del agente sin dependencia directa de la SDK. |
 | **F4 — Chat UI + Gantt en vivo** | ChatPanel con SSE; Gantt se actualiza al ejecutar tools; highlight | Conversación mueve una barra visible sin recargar. |
 | **F5 — RAG** | Subida de docs (PDF/MD/TXT), ingesta (chunk + embeddings OpenAI), `search_documents`, citas | "¿Qué dice el spec sobre X?" responde citando el archivo. |
 | **F6 — Conflictos + pulido** | `detect_conflicts` + UX de errores/estados vacíos | "¿Hay conflictos?" lista solapes/dependencias inválidas. |
@@ -220,7 +229,7 @@ F1 ─► F5   (chunks/embeddings dependen del esquema)
 ## 9. Risk Assessment
 
 - **R1 — Deuda de portabilidad de embeddings**: se fijó OpenAI `text-embedding-3-small` (1536 dims). *Mitigación*: `EmbeddingsProvider` tras interfaz; la dimensión `vector(1536)` queda acoplada al esquema — un cambio de proveedor implicaría re-embedding + migración de la columna.
-- **R2 — Segundo vendor (OpenAI además de Anthropic)**: dos API keys/costos. *Mitigación*: uso mínimo (solo embeddings); `text-embedding-3-small` es muy barato; documentar en README.
+- **R2 — Dependencia de un solo vendor (OpenAI para agente + embeddings)**: al consolidar, un incidente/límite de OpenAI afecta agente y RAG a la vez, y el modelo OpenAI de tool-calling define el comportamiento del agente. *Mitigación (ya diseñada)*: el agente depende de `LLMProvider` y los embeddings de `EmbeddingsProvider`; un `AnthropicProvider` (o similar) se enchufa sin reescribir el dominio, y `ANTHROPIC_API_KEY` queda documentada en `.env.example` para ese camino. Trade-off aceptado: simplicidad de credenciales/infra para la demo.
 - **R3 — Límites free tier Supabase** (pausa por inactividad, tamaño): aceptable para demo; documentar en README.
 - **R4 — Adaptar Frappe Gantt (SVG imperativo) a React**: la referencia manipula el DOM directamente. *Mitigación*: wrapper con `useRef` + método `refresh(tasks)`; no re-montar en cada render.
 - **R5 — Parseo de fechas / zonas horarias** en las tools: normalizar a `YYYY-MM-DD` (la referencia trae `normalizeDate`).
@@ -236,8 +245,9 @@ F1 ─► F5   (chunks/embeddings dependen del esquema)
 2. **Embeddings** → **OpenAI `text-embedding-3-small` (1536 dims)**. Motivo: "OpenAI" apareció como keyword explícito en las vacantes reales; se prioriza reconocibilidad de mercado sobre el argumento de ecosistema Anthropic (Voyage no apareció en ninguna vacante).
 3. **Auth** → **Sin login; un único proyecto demo compartido**. Auth queda como nice-to-have documentado.
 4. **Formatos RAG** → **PDF + Markdown + TXT** (sin `.docx` en el MVP).
+5. **Proveedor del agente (LLM)** → **OpenAI** (function/tool calling), NO Claude, para el MVP. *Motivo*: consolidar agente + embeddings bajo un solo proveedor simplifica credenciales/infra para la demo. *Extensibilidad*: el agente depende de la interfaz **`LLMProvider`** (implementación inicial única `OpenAIProvider`); volver a Claude u otro proveedor será añadir un adaptador, sin reescribir el dominio. `ANTHROPIC_API_KEY` se conserva comentada en `.env.example` como puerta abierta intencional.
 
-**Supuestos vigentes**: interfaz en español/bilingüe (el agente responde en el idioma del usuario); SSE para streaming; seed de proyecto pre-cargado; vista "Dashboard" de la referencia solo si sobra tiempo (fuera del core); modelo por defecto `claude-opus-4-8` con streaming.
+**Supuestos vigentes**: interfaz en español/bilingüe (el agente responde en el idioma del usuario); SSE para streaming; seed de proyecto pre-cargado; vista "Dashboard" de la referencia solo si sobra tiempo (fuera del core); modelo del agente por defecto: OpenAI con tool-calling y streaming (modelo concreto se fija en F3), vía `LLMProvider`.
 
 ---
 
