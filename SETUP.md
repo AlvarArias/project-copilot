@@ -28,7 +28,7 @@ roadmap and architecture, see [`PLAN.md`](./PLAN.md).
 
    ```bash
    cp .env.example .env
-   # then fill in ANTHROPIC_API_KEY, OPENAI_API_KEY, DATABASE_URL
+   # then fill in OPENAI_API_KEY, DATABASE_URL
    ```
 
 5. Run the app:
@@ -46,6 +46,7 @@ npm run lint         # eslint (reference-ui/ is excluded, see below)
 npm run test         # vitest run
 npm run test:watch   # vitest --watch
 npm run build         # production build (also used by the Docker image)
+npm run seed          # seed the demo project (see Module E in PLAN.md)
 ```
 
 ## `reference-ui/`
@@ -76,14 +77,13 @@ These require accounts/credentials that can't be scripted here:
   `DATABASE_URL` for production.
 - [ ] Run `migrations/0001_init.sql` against the Supabase project (SQL
   Editor → New query → paste → Run) — the same file used for local dev.
-- [ ] **Anthropic**: create an API key at
-  https://console.anthropic.com/settings/keys → `ANTHROPIC_API_KEY`.
 - [ ] **OpenAI**: create an API key at
-  https://platform.openai.com/api-keys → `OPENAI_API_KEY`.
+  https://platform.openai.com/api-keys → `OPENAI_API_KEY` (used for both the
+  agent's tool-calling and embeddings — see PLAN.md decision D5).
 - [ ] **GitHub**: create the remote repository and push this local repo
   (`git remote add origin <url> && git push -u origin main`). The CI
   workflow at `.github/workflows/ci.yml` will start running once the repo
   exists on GitHub — nothing else to configure.
 - [ ] **Vercel**: import the GitHub repo and set the same env vars
-  (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `DATABASE_URL`) as project
-  environment variables for deployment (see Module F in `PLAN.md`).
+  (`OPENAI_API_KEY`, `DATABASE_URL`) as project environment variables for
+  deployment (see Module F in `PLAN.md`).
