@@ -12,6 +12,12 @@ jobs:
   nightly-maintenance:
     runs-on: ubuntu-latest
     timeout-minutes: 30     # corta el job si algo se queda colgado
+    env:
+      # claude-code-base-action runs its own internal Node setup step, which
+      # defaults to 18.x when NODE_VERSION isn't set. That step runs after
+      # ours below and its PATH change wins, silently shadowing our Node 20
+      # for the rest of the job — breaking `npm test` (vitest requires >=20).
+      NODE_VERSION: "20"
     steps:
       - name: Checkout del repo
         uses: actions/checkout@v4
