@@ -25,7 +25,6 @@ jobs:
         uses: anthropics/claude-code-base-action@0d872d2732a6437c1cf868d7d8c9d0b8850496b6
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}  # generado con `claude setup-token`
-          show_full_output: "true"   # TEMP: para diagnosticar el error is_error:true, revertir después
           claude_args: |
             --allowedTools "Read,Edit,Bash(npm test),Bash(npm audit),Bash(git log),Bash(git diff)" --model claude-sonnet-5 --max-turns 15
           prompt: |
