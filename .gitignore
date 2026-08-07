@@ -38,6 +38,9 @@ yarn-error.log*
 # vercel
 .vercel
 
+# per-subagent working memory (local notes, not project source)
+.claude/agent-memory/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
