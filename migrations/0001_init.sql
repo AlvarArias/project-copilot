@@ -6,7 +6,10 @@
 --   - a local Postgres via psql, e.g.:
 --       psql "$DATABASE_URL" -f migrations/0001_init.sql
 --
--- Idempotent: safe to re-run (uses IF NOT EXISTS throughout).
+-- Idempotent: safe to re-run. Tables/indexes use IF NOT EXISTS; the
+-- tasks.updated_at trigger uses CREATE OR REPLACE FUNCTION plus
+-- DROP TRIGGER IF EXISTS + CREATE TRIGGER, since triggers have no
+-- IF NOT EXISTS form in Postgres 16.
 -- No ORM/migrator here by design — plain SQL for F0. F1 adds the `pg`
 -- driver and repositories on top of this schema (see PLAN.md).
 
@@ -41,13 +44,28 @@ create table if not exists tasks (
 
 create index if not exists tasks_project_id_idx on tasks (project_id);
 
+create or replace function set_updated_at()
+returns trigger as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$ language plpgsql;
+
+drop trigger if exists tasks_set_updated_at on tasks;
+create trigger tasks_set_updated_at
+  before update on tasks
+  for each row
+  execute function set_updated_at();
+
 -- ---------------------------------------------------------------------------
 -- task_dependencies (task_id depends on depends_on_id)
 -- ---------------------------------------------------------------------------
 create table if not exists task_dependencies (
   task_id       uuid not null references tasks (id) on delete cascade,
   depends_on_id uuid not null references tasks (id) on delete cascade,
-  primary key (task_id, depends_on_id)
+  primary key (task_id, depends_on_id),
+  check (task_id <> depends_on_id)
 );
 
 create index if not exists task_dependencies_depends_on_id_idx
@@ -78,10 +96,11 @@ create table if not exists document_chunks (
   id          uuid primary key default gen_random_uuid(),
   document_id uuid not null references documents (id) on delete cascade,
   project_id  uuid not null references projects (id) on delete cascade,
-  chunk_index int,
-  content     text,
+  chunk_index int not null,
+  content     text not null,
   token_count int,
-  embedding   vector(1536)
+  embedding   vector(1536),
+  unique (document_id, chunk_index)
 );
 
 create index if not exists document_chunks_project_id_idx
@@ -99,7 +118,7 @@ create index if not exists document_chunks_embedding_hnsw_idx
 create table if not exists messages (
   id         uuid primary key default gen_random_uuid(),
   project_id uuid not null references projects (id) on delete cascade,
-  role       text,
+  role       text not null check (role in ('user', 'assistant')),
   content    text,
   tool_calls jsonb,
   created_at timestamptz not null default now()
