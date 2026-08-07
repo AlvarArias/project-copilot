@@ -1,0 +1,48 @@
+name: Nightly Maintenance
+
+on:
+  schedule:
+    - cron: "0 3 * * *"   # 03:00 UTC todos los días
+  workflow_dispatch: {}    # permite lanzarlo a mano desde la pestaña Actions
+
+permissions:
+  contents: read           # súbelo a "write" solo si vas a dejar que haga commit
+
+jobs:
+  nightly-maintenance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30     # corta el job si algo se queda colgado
+    steps:
+      - name: Checkout del repo
+        uses: actions/checkout@v4
+
+      - name: Correr Claude Code (orquestador + subagentes)
+        uses: anthropics/claude-code-base-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}  # generado con `claude setup-token`
+          prompt: |
+            Eres el orquestador del mantenimiento nocturno de este repositorio.
+
+            Haz lo siguiente en orden:
+            1. Usa el subagente test-runner para correr y, si es seguro, arreglar los tests.
+            2. Usa el subagente dep-auditor para revisar dependencias y aplicar
+               actualizaciones seguras.
+            3. Usa el subagente doc-updater para poner al día el README y comentarios
+               si hubo cambios relevantes.
+            4. Escribe un resumen final en nightly-summary.md con:
+               - qué se arregló automáticamente
+               - qué quedó pendiente y requiere revisión humana
+               - si hay algo urgente, empieza el resumen con '⚠️ URGENTE:'
+
+            No hagas commit ni push de nada — deja los cambios en el working
+            directory para que se suban como artifact.
+          claude_args: |
+            --allowedTools "Read,Edit,Bash(npm test),Bash(npm audit),Bash(git log),Bash(git diff)" --model claude-sonnet-5 --max-turns 15
+
+      - name: Subir resumen como artifact
+        if: always()          # sube el resumen aunque el paso anterior falle a medias
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-summary-${{ github.run_id }}
+          path: nightly-summary.md
+          retention-days: 14
