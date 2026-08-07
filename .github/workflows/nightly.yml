@@ -17,13 +17,16 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Correr Claude Code (orquestador + subagentes)
-        uses: anthropics/claude-code-base-action@v0.0.63
+        # Pinned to a commit SHA on `main`, not a tag: the latest published tag
+        # (v0.0.63) bundles Claude Code CLI 1.0.88, which is incompatible with
+        # OAuth tokens from `claude setup-token` on current CLI versions and
+        # fails with "API Error: Header '14' has invalid value". `main` installs
+        # CLI 2.1.224 and is what actually works with a Pro OAuth token.
+        uses: anthropics/claude-code-base-action@0d872d2732a6437c1cf868d7d8c9d0b8850496b6
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}  # generado con `claude setup-token`
-          model: claude-sonnet-5
-          allowed_tools: "Read,Edit,Bash(npm test),Bash(npm audit),Bash(git log),Bash(git diff)"
-          max_turns: "15"
-          timeout_minutes: "25"   # deja margen bajo el timeout-minutes: 30 del job
+          claude_args: |
+            --allowedTools "Read,Edit,Bash(npm test),Bash(npm audit),Bash(git log),Bash(git diff)" --model claude-sonnet-5 --max-turns 15
           prompt: |
             Eres el orquestador del mantenimiento nocturno de este repositorio.
 
