@@ -9,9 +9,10 @@
 
 import { closePool } from "@/db/pool";
 import { createRepositories } from "@/repositories";
+import { DEMO_PROJECT_NAME } from "@/domain/demo-project";
 import type { TaskStatus } from "@/domain/types";
 
-const PROJECT_NAME = "Lanzamiento MarketPulse — App Móvil de Analítica";
+const PROJECT_NAME = DEMO_PROJECT_NAME;
 
 interface TaskSeed {
   key: string;

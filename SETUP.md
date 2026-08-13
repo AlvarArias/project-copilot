@@ -43,11 +43,31 @@ roadmap and architecture, see [`PLAN.md`](./PLAN.md).
 
 ```bash
 npm run lint         # eslint (reference-ui/ is excluded, see below)
+npm run typecheck    # tsc --noEmit
 npm run test         # vitest run
 npm run test:watch   # vitest --watch
 npm run build         # production build (also used by the Docker image)
 npm run seed          # seed the demo project (see Module E in PLAN.md)
 ```
+
+## Verifying F3 (agent + `/api/chat`) manually
+
+Once `OPENAI_API_KEY` is set and `npm run seed` has populated the demo
+project, start the dev server (`npm run dev`) and stream a turn against the
+agent with `curl`:
+
+```bash
+curl -N -X POST http://localhost:3000/api/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message":"Crea una tarea Diseño del 1 al 5 de septiembre"}'
+```
+
+`-N` disables curl's output buffering so you see each SSE frame as it
+arrives. You should see a stream of `event: tool` / `event: token` frames
+followed by a terminal `event: done` frame carrying the persisted assistant
+`messageId` — see the wire contract documented at the top of
+`src/app/api/chat/route.ts`. Omit `message`, or pass an empty string, to see
+the `400` validation response instead.
 
 ## `reference-ui/`
 

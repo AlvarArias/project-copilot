@@ -1,0 +1,212 @@
+/**
+ * Adapted from reference-ui/gantt.css. That file leaned on CSS custom
+ * properties defined by the app it originally shipped in; those don't
+ * exist here, so they're defined below, scoped to `.gantt-view` rather
+ * than `:root`.
+ *
+ * Pinned from literals in reference-ui/gantt.js and reference-ui/gantt.css:
+ * --accent, --surface, --border, --text-muted, --highlight (and its
+ * progress-fill companion, applied directly to .bar-highlight .bar-progress
+ * below). --accent-hover, --surface-2, --text, --error, and --radius are
+ * not pinned by the reference; values chosen here stay within the same
+ * dark palette.
+ *
+ * F2 is read-only: drag-scroll, the view-mode switcher, the dashboard tab,
+ * and the highlight-dimming/`.has-highlights` animation are intentionally
+ * not ported (see PLAN.md phase F2 scope). `.bar-highlight` styling itself
+ * is kept — F4 reuses the class, it just never gets applied yet.
+ */
+
+.gantt-view {
+  --accent: #5b8dee;
+  --accent-hover: #7ba0f5;
+  --surface: #1a1d27;
+  --surface-2: #20242f;
+  --border: #2e3248;
+  --text: #e4e7f0;
+  --text-muted: #8892a4;
+  --highlight: #f6a623;
+  --error: #ef4444;
+  --radius: 8px;
+
+  color: var(--text);
+}
+
+.gantt-skip-note {
+  margin: 0 0 12px;
+  font-size: 12px;
+  color: var(--highlight);
+}
+
+/* ── Status states ───────────────────────────────────────────────────────── */
+.status-state {
+  padding: 40px 0;
+  text-align: center;
+  color: var(--text-muted);
+}
+.status-state.error {
+  color: var(--error);
+}
+
+/* ── Wrapper (left panel + chart side by side) ──────────────────────────── */
+.gantt-wrapper {
+  display: flex;
+  height: min(70vh, 640px);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+/* ── Left panel ──────────────────────────────────────────────────────────── */
+.gantt-left-panel {
+  width: 280px;
+  flex-shrink: 0;
+  overflow-y: scroll;
+  scrollbar-width: none;
+  border-right: 1px solid var(--border);
+  background: var(--surface-2);
+  display: flex;
+  flex-direction: column;
+}
+.gantt-left-panel::-webkit-scrollbar {
+  display: none;
+}
+
+.lp-header,
+.lp-row {
+  display: grid;
+  grid-template-columns: 1fr 56px 56px 40px;
+  align-items: center;
+  padding: 0 12px;
+  gap: 6px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+/* matches Frappe Gantt's header height (two date rows) */
+.lp-header {
+  height: 50px;
+  flex-shrink: 0;
+  color: var(--text-muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+/* matches bar_height (28) + padding (18) = 46px */
+.lp-row {
+  height: 46px;
+  color: var(--text);
+  border-bottom: 1px solid var(--border);
+  border-left: 3px solid transparent;
+}
+.lp-row:last-child {
+  border-bottom: none;
+}
+
+.lp-row.bar-highlight {
+  border-left-color: var(--highlight);
+  background: rgba(246, 166, 35, 0.07);
+}
+.lp-row.bar-highlight .lp-name {
+  color: var(--highlight);
+  font-weight: 500;
+}
+
+.lp-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lp-date {
+  color: var(--text-muted);
+}
+.lp-days {
+  color: var(--text-muted);
+  text-align: right;
+}
+
+/* ── Chart container ─────────────────────────────────────────────────────── */
+.gantt-chart-container {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* Frappe's own inner scroll container */
+.gantt-chart-container .gantt-container {
+  height: 100%;
+  scrollbar-width: thin;
+  scrollbar-color: var(--text-muted) var(--surface-2);
+}
+.gantt-chart-container .gantt-container::-webkit-scrollbar {
+  width: 6px;
+  height: 12px;
+}
+.gantt-chart-container .gantt-container::-webkit-scrollbar-track {
+  background: var(--surface-2);
+}
+.gantt-chart-container .gantt-container::-webkit-scrollbar-thumb {
+  background: var(--text-muted);
+  border-radius: 4px;
+}
+.gantt-chart-container .gantt-container::-webkit-scrollbar-thumb:hover {
+  background: var(--accent);
+}
+
+/* ── Frappe Gantt overrides ──────────────────────────────────────────────── */
+.gantt .grid-background {
+  fill: var(--surface-2) !important;
+}
+.gantt .grid-header {
+  fill: var(--surface) !important;
+}
+
+.gantt .grid-row {
+  fill: var(--surface) !important;
+}
+.gantt .grid-row:nth-child(even) {
+  fill: var(--surface-2) !important;
+}
+
+.gantt .row-line,
+.gantt .tick {
+  stroke: var(--border) !important;
+}
+
+.gantt .lower-text,
+.gantt .upper-text {
+  fill: var(--text-muted) !important;
+  font-size: 11px !important;
+}
+
+.gantt .bar-label {
+  fill: #fff !important;
+  font-size: 11px !important;
+}
+
+.gantt .today-highlight {
+  fill: rgba(91, 141, 238, 0.07) !important;
+}
+
+/* Default bar */
+.gantt .bar-default .bar {
+  fill: var(--accent) !important;
+}
+.gantt .bar-default .bar-progress {
+  fill: var(--accent-hover) !important;
+}
+
+/* Highlighted bar (styling only — F4 is what actually applies this class) */
+.gantt .bar-highlight .bar {
+  fill: var(--highlight) !important;
+}
+.gantt .bar-highlight .bar-progress {
+  fill: #d48c10 !important;
+}
+
+/* Read-only: bars aren't draggable or clickable in F2 */
+.gantt .bar-wrapper {
+  pointer-events: none;
+}

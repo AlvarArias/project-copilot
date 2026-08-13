@@ -51,9 +51,49 @@ describe("PgMessageRepository.create", () => {
 
     const message = await repo.create({ projectId: PROJECT_ID, role: "assistant", content: "Done.", toolCalls });
 
-    expect(calls[0].params).toEqual([PROJECT_ID, "assistant", "Done.", toolCalls]);
+    // Regression: `toolCalls` must reach `pg` pre-serialized. Handing it the
+    // raw array makes `pg` emit a Postgres array literal (`{...}`), which the
+    // `jsonb` column rejects at runtime with "invalid input syntax for type
+    // json" — a failure a fake db can never surface, so it is pinned here.
+    expect(calls[0].params).toEqual([PROJECT_ID, "assistant", "Done.", JSON.stringify(toolCalls)]);
     expect(message.role).toBe("assistant");
     expect(message.toolCalls).toEqual(toolCalls);
+  });
+
+  it("serializes a non-array toolCalls value and leaves null alone", async () => {
+    const { db, calls } = fakeDb([
+      {
+        rows: [
+          {
+            id: MESSAGE_ID,
+            project_id: PROJECT_ID,
+            role: "assistant",
+            content: null,
+            tool_calls: null,
+            created_at: "2026-09-01T00:00:00.000Z",
+          },
+        ],
+      },
+      {
+        rows: [
+          {
+            id: MESSAGE_ID,
+            project_id: PROJECT_ID,
+            role: "assistant",
+            content: null,
+            tool_calls: null,
+            created_at: "2026-09-01T00:00:00.000Z",
+          },
+        ],
+      },
+    ]);
+    const repo = new PgMessageRepository(db);
+
+    await repo.create({ projectId: PROJECT_ID, role: "assistant", toolCalls: { name: "list_tasks" } });
+    expect(calls[0].params?.[3]).toBe('{"name":"list_tasks"}');
+
+    await repo.create({ projectId: PROJECT_ID, role: "assistant", toolCalls: null });
+    expect(calls[1].params?.[3]).toBeNull();
   });
 
   it("maps tool_calls -> toolCalls and passes nullable content through", async () => {

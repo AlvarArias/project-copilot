@@ -26,6 +26,16 @@ function mapRow(row: MessageRow): Message {
   };
 }
 
+/**
+ * Encodes `toolCalls` for the `jsonb` column. Handing `pg` a raw JS value is
+ * NOT safe here: it serializes arrays as Postgres array literals (`{...}`),
+ * which `jsonb` rejects with "invalid input syntax for type json". The agent's
+ * audit trail is an array, so it hit this on every tool-using turn.
+ */
+function serializeToolCalls(toolCalls: unknown): string | null {
+  return toolCalls === undefined || toolCalls === null ? null : JSON.stringify(toolCalls);
+}
+
 /** Reads and writes `messages` rows. */
 export class PgMessageRepository implements MessageRepository {
   constructor(private readonly db: Queryable) {}
@@ -35,7 +45,7 @@ export class PgMessageRepository implements MessageRepository {
       `insert into messages (project_id, role, content, tool_calls)
        values ($1, $2, $3, $4)
        returning *`,
-      [input.projectId, input.role, input.content ?? null, input.toolCalls ?? null],
+      [input.projectId, input.role, input.content ?? null, serializeToolCalls(input.toolCalls)],
     );
     return mapRow(result.rows[0]);
   }
