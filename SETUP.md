@@ -17,11 +17,13 @@ roadmap and architecture, see [`PLAN.md`](./PLAN.md).
    docker compose up -d
    ```
 
-3. Apply the schema migration:
+3. Apply the schema migrations:
 
    ```bash
    psql "postgresql://postgres:postgres@localhost:5432/project_copilot" \
      -f migrations/0001_init.sql
+   psql "postgresql://postgres:postgres@localhost:5432/project_copilot" \
+     -f migrations/0002_health_check.sql
    ```
 
 4. Configure environment variables:
@@ -48,6 +50,9 @@ npm run test         # vitest run
 npm run test:watch   # vitest --watch
 npm run build         # production build (also used by the Docker image)
 npm run seed          # seed the demo project (see Module E in PLAN.md)
+npm run db:health-check  # insert + delete one row in `_health_check`, to
+                          # verify DATABASE_URL is reachable (used by the
+                          # db-health-check GitHub Actions workflow)
 ```
 
 ## Verifying F3 (agent + `/api/chat`) manually
@@ -95,8 +100,9 @@ These require accounts/credentials that can't be scripted here:
   (Database → Extensions → search "vector" → Enable). Copy the connection
   string (Project Settings → Database → Connection string → URI) into
   `DATABASE_URL` for production.
-- [ ] Run `migrations/0001_init.sql` against the Supabase project (SQL
-  Editor → New query → paste → Run) — the same file used for local dev.
+- [ ] Run `migrations/0001_init.sql` and `migrations/0002_health_check.sql`
+  against the Supabase project (SQL Editor → New query → paste → Run) — the
+  same files used for local dev.
 - [ ] **OpenAI**: create an API key at
   https://platform.openai.com/api-keys → `OPENAI_API_KEY` (used for both the
   agent's tool-calling and embeddings — see PLAN.md decision D5).
@@ -107,3 +113,7 @@ These require accounts/credentials that can't be scripted here:
 - [ ] **Vercel**: import the GitHub repo and set the same env vars
   (`OPENAI_API_KEY`, `DATABASE_URL`) as project environment variables for
   deployment (see Module F in `PLAN.md`).
+- [ ] **GitHub Actions secret**: add `DATABASE_URL` (the same Supabase
+  connection string) under Settings → Secrets and variables → Actions →
+  New repository secret. Required for the `db-health-check` workflow
+  (`.github/workflows/db-health-check.yml`) to reach the database.

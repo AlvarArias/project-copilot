@@ -1,0 +1,31 @@
+name: DB Health Check
+
+on:
+  workflow_dispatch: {}     # permite lanzarlo a mano desde la pestaña Actions
+  schedule:
+    - cron: "0 4 * * *"      # 04:00 UTC todos los días
+
+permissions:
+  contents: read
+
+jobs:
+  db-health-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout del repo
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Insertar y borrar un registro de prueba en Supabase
+        run: npm run db:health-check
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}

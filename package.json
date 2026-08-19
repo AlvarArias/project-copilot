@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "seed": "node --env-file=.env --import tsx src/scripts/seed.ts"
+    "seed": "node --env-file=.env --import tsx src/scripts/seed.ts",
+    "db:health-check": "tsx src/scripts/db-health-check.ts"
   },
   "dependencies": {
     "frappe-gantt": "^0.6.1",
